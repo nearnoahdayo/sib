@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>에코 히어로 - 기후변화 보상 다이어리</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+    </style>
+</head>
+<body class="bg-emerald-50 min-h-screen text-slate-800">
+
+    <!-- 상단 헤더 -->
+    <header class="bg-emerald-600 text-white shadow-md py-6 px-4">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold flex items-center gap-2">🌱 에코 히어로즈</h1>
+                <p class="text-emerald-100 text-sm">인증하고 보상을 받아 나무를 키워보세요!</p>
+            </div>
+            <div class="bg-emerald-700 px-4 py-2 rounded-2xl text-center shadow-inner">
+                <span class="block text-xs text-emerald-200">내 에코 포인트</span>
+                <span id="total-points" class="text-xl font-bold text-yellow-300">0 P</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 컨테이너 -->
+    <main class="max-w-md mx-auto p-4 space-y-6 mb-12">
+
+        <!-- 레벨 및 나무 성장 시각화 영역 -->
+        <section class="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100 text-center relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-bl-xl font-semibold" id="level-badge">LV.1 새싹 등급</div>
+            <div class="text-6xl my-3 transition-transform duration-500 transform hover:scale-110" id="tree-icon">🌱</div>
+            <h2 class="text-lg font-bold text-slate-700" id="tree-title">새싹 지킴이</h2>
+            <p class="text-xs text-slate-500 mt-1" id="tree-desc">실천을 기록하고 나만의 반려 나무를 키워보세요!</p>
+            
+            <!-- 경험치 바 -->
+            <div class="mt-4">
+                <div class="flex justify-between text-xs text-slate-500 mb-1">
+                    <span id="exp-text">성장 지수 0 / 100 P</span>
+                    <span id="next-level-text">다음 단계까지 100 P</span>
+                </div>
+                <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                    <div id="exp-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 오늘 실천 체크리스트 + 사진 업로드/촬영 -->
+        <section class="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100">
+            <h3 class="font-bold text-slate-700 mb-4 flex items-center justify-between">
+                <span>✨ 오늘의 친환경 미션</span>
+                <span class="text-xs font-normal text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">사진 인증 시 +10P 보너스!</span>
+            </h3>
+            
+            <div class="space-y-4" id="mission-list">
+                <!-- 미션 아이템들은 자바스크립트로 동적 생성 -->
+            </div>
+        </section>
+
+        <!-- 나의 탄소 저감 성과 -->
+        <section class="bg-emerald-900 text-white p-6 rounded-3xl shadow-md">
+            <h3 class="font-bold text-emerald-200 mb-3 text-sm">🌍 지금까지 이뤄낸 기적</h3>
+            <div class="grid grid-cols-2 gap-4 text-center">
+                <div class="bg-emerald-800/60 p-3 rounded-2xl">
+                    <span class="block text-2xl font-bold text-yellow-300" id="co2-saved">0 kg</span>
+                    <span class="text-xs text-emerald-300">탄소 감축량</span>
+                </div>
+                <div class="bg-emerald-800/60 p-3 rounded-2xl">
+                    <span class="block text-2xl font-bold text-emerald-300" id="tree-equivalent">0 그루</span>
+                    <span class="text-xs text-emerald-300">소나무 식재 효과</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 자바스크립트 로직 -->
+    <script>
+        let state = {
+            points: 0,
+            co2: 0,
+            missions: [
+                { id: 1, title: "텀블러/다회용컵 사용하기", reward: 20, co2: 0.2, completed: false, image: null },
+                { id: 2, title: "대중교통 또는 자전거 이용하기", reward: 50, co2: 1.5, completed: false, image: null },
+                { id: 3, title: "잔반 없이 깨끗하게 식사하기", reward: 15, co2: 0.15, completed: false, image: null },
+                { id: 4, title: "콘센트 뽑아 대기전력 차단하기", reward: 10, co2: 0.1, completed: false, image: null },
+                { id: 5, title: "외출 시 장바구니 사용하기", reward: 20, co2: 0.3, completed: false, image: null }
+            ]
+        };
+
+        function loadData() {
+            const saved = localStorage.getItem('eco_hero_state_v3');
+            if (saved) {
+                state = JSON.parse(saved);
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('eco_hero_state_v3', JSON.stringify(state));
+        }
+
+        function render() {
+            document.getElementById('total-points').innerText = state.points + ' P';
+            document.getElementById('co2-saved').innerText = state.co2.toFixed(1) + ' kg';
+            document.getElementById('tree-equivalent').innerText = (state.co2 / 6.6).toFixed(1) + ' 그루';
+
+            const level = Math.floor(state.points / 100) + 1;
+            const currentExpInLevel = state.points % 100;
+            
+            document.getElementById('exp-bar').style.width = currentExpInLevel + '%';
+            document.getElementById('exp-text').innerText = `성장 지수 ${currentExpInLevel} / 100 P`;
+            document.getElementById('next-level-text').innerText = `다음 단계까지 ${100 - currentExpInLevel} P`;
+
+            let treeEmoji = '🌱';
+            let treeTitle = '새싹 지킴이 (LV.1)';
+            let levelBadgeText = 'LV.1 새싹';
+
+            if (level >= 5) {
+                treeEmoji = '🌳';
+                treeTitle = '거대한 숲의 수호자 (LV.5+)';
+                levelBadgeText = 'LV.' + level + ' 마스터';
+            } else if (level >= 4) {
+                treeEmoji = '🌲';
+                levelBadgeText = 'LV.' + level + ' 큰 나무';
+                treeTitle = '푸른 숲 가꾸미 (LV.4)';
+            } else if (level >= 3) {
+                treeEmoji = '🌿';
+                levelBadgeText = 'LV.' + level + ' 묘목';
+                treeTitle = '자라나는 나무 (LV.3)';
+            } else if (level >= 2) {
+                treeEmoji = '🪴';
+                levelBadgeText = 'LV.' + level + ' 줄기';
+                treeTitle = '튼튼한 줄기 (LV.2)';
+            }
+
+            document.getElementById('tree-icon').innerText = treeEmoji;
+            document.getElementById('tree-title').innerText = treeTitle;
+            document.getElementById('level-badge').innerText = levelBadgeText;
+
+            const listContainer = document.getElementById('mission-list');
+            listContainer.innerHTML = '';
+
+            state.missions.forEach(mission => {
+                const item = document.createElement('div');
+                item.className = `p-4 rounded-2xl border transition-all ${
+                    mission.completed 
+                        ? 'bg-emerald-50 border-emerald-200' 
+                        : 'bg-slate-50 border-slate-100 hover:border-emerald-200'
+                }`;
+
+                item.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" ${mission.completed ? 'checked' : ''} 
+                                onchange="toggleMission(${mission.id})"
+                                class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer">
+                            <span class="${mission.completed ? 'line-through text-slate-400' : 'text-slate-700 font-medium'} text-sm">
+                                ${mission.title}
+                            </span>
+                        </div>
+                        <span class="text-xs font-bold text-emerald-600 bg-emerald-100/60 px-2 py-1 rounded-lg">
+                            +${mission.reward} P
+                        </span>
+                    </div>
+
+                    <!-- 사진 인증 및 업로드 버튼 영역 -->
+                    <div class="mt-3 pl-8">
+                        ${mission.image ? `
+                            <div class="relative inline-block">
+                                <img src="${mission.image}" class="w-20 h-20 object-cover rounded-xl border border-emerald-300 shadow-sm" alt="인증샷">
+                                <button onclick="removeImage(${mission.id})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow hover:bg-red-600">×</button>
+                            </div>
+                        ` : `
+                            <div class="flex flex-wrap gap-2">
+                                <!-- 1. 카메라로 바로 찍기 버튼 (모바일 최적화) -->
+                                <label class="inline-flex items-center gap-1.5 text-xs bg-emerald-600 text-white px-3 py-2 rounded-xl cursor-pointer hover:bg-emerald-700 shadow-sm transition font-medium">
+                                    📸 사진 촬영
+                                    <input type="file" accept="image/*" capture="environment" class="hidden" onchange="uploadImage(event, ${mission.id})">
+                                </label>
+
+                                <!-- 2. 내 파일(갤러리)에서 업로드 버튼 -->
+                                <label class="inline-flex items-center gap-1.5 text-xs bg-white text-emerald-700 border border-emerald-200 px-3 py-2 rounded-xl cursor-pointer hover:bg-emerald-50 shadow-sm transition font-medium">
+                                    📁 내 파일에서 선택
+                                    <input type="file" accept="image/*" class="hidden" onchange="uploadImage(event, ${mission.id})">
+                                </label>
+                            </div>
+                        `}
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        function toggleMission(id) {
+            const mission = state.missions.find(m => m.id === id);
+            if (!mission) return;
+
+            if (!mission.completed) {
+                mission.completed = true;
+                state.points += mission.reward;
+                state.co2 += mission.co2;
+                
+                confetti({
+                    particleCount: 80,
+                    spread: 60,
+                    origin: { y: 0.8 }
+                });
+            } else {
+                mission.completed = false;
+                state.points -= mission.reward;
+                state.co2 = Math.max(0, state.co2 - mission.co2);
+            }
+
+            saveData();
+            render();
+        }
+
+        // 이미지 처리 함수
+        function uploadImage(event, id) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const mission = state.missions.find(m => m.id === id);
+                if (mission) {
+                    mission.image = e.target.result;
+                    
+                    if (!mission.completed) {
+                        mission.completed = true;
+                        state.points += (mission.reward + 10); // 기본 보상 + 인증 보너스 10점
+                        state.co2 += mission.co2;
+                    } else {
+                        state.points += 10; // 이미 완료된 상태에서 사진만 추가해도 보너스
+                    }
+
+                    confetti({
+                        particleCount: 120,
+                        spread: 80,
+                        origin: { y: 0.7 }
+                    });
+
+                    saveData();
+                    render();
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 인증 사진 삭제
+        function removeImage(id) {
+            const mission = state.missions.find(m => m.id === id);
+            if (mission) {
+                mission.image = null;
+                state.points = Math.max(0, state.points - 10); // 보너스 포인트 회수
+                saveData();
+                render();
+            }
+        }
+
+        loadData();
+        render();
+    </script>
+</body>
+</html>
